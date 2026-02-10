@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import OpeningScreen from './components/OpeningScreen'; // Make sure path is correct
+import OpeningScreen from './components/OpeningScreen'; 
 import MainPage from './components/MainPage';
 
 function App() {
@@ -8,6 +8,7 @@ function App() {
   return (
     <div className="App">
       {!isUnlocked ? (
+        // Pass the state setter directly
         <OpeningScreen onUnlock={() => setIsUnlocked(true)} />
       ) : (
         <MainPage />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, Trophy, Sparkles, RefreshCcw } from "lucide-react";
+import { Heart, Trophy, RefreshCcw } from "lucide-react";
 
 // --- CONFIGURATION ---
 const images = Array.from({ length: 18 }, (_, i) => `/game-photos/${i + 1}.avif`);
@@ -37,7 +37,7 @@ export default function PhotoPairGame({ handleShowProposal }) {
   const [selected, setSelected] = useState([]);
   const [matched, setMatched] = useState([]);
   const [incorrect, setIncorrect] = useState([]);
-  const [gameKey, setGameKey] = useState(0); // For easy reset
+  const [gameKey, setGameKey] = useState(0);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -140,7 +140,7 @@ export default function PhotoPairGame({ handleShowProposal }) {
             return (
               <motion.div
                 key={index}
-                className="w-[11vw] h-[11vw] sm:w-16 sm:h-16 md:w-20 md:h-20 relative cursor-pointer"
+                className="w-[11vw] h-[11vw] sm:w-16 sm:h-16 md:w-20 md:h-20 relative cursor-pointer group"
                 whileHover={{ scale: 1.08, y: -4, rotateZ: 1 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => handleClick(index)}
@@ -151,12 +151,35 @@ export default function PhotoPairGame({ handleShowProposal }) {
                   transition={{ type: "spring", stiffness: 260, damping: 20 }}
                   style={{ transformStyle: "preserve-3d" }}
                 >
-                  {/* --- CARD BACK --- */}
+                  {/* --- POLISHED CARD BACK --- */}
                   <div 
-                    className="absolute inset-0 w-full h-full bg-gradient-to-br from-white/10 to-white/[0.02] backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-red-500/20"
+                    className="absolute inset-0 w-full h-full bg-gradient-to-br from-white/10 to-white/[0.02] backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center shadow-lg overflow-hidden"
                     style={{ backfaceVisibility: "hidden" }}
                   >
-                    <Sparkles size={16} className="text-white/10 group-hover:text-red-500/40 transition-colors" />
+                    {/* Radial Bloom on Hover */}
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] from-red-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                    {/* Heartbeat Pulse Icon */}
+                    <motion.div
+                      animate={{
+                        scale: [1, 1.1, 1],
+                        opacity: [0.2, 0.4, 0.2],
+                      }}
+                      transition={{
+                        duration: 2.5,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                      className="relative z-10"
+                    >
+                      <Heart 
+                        size={22} 
+                        className="text-white/20 fill-white/10 group-hover:text-red-500/80 group-hover:fill-red-500/40 transition-all duration-500 group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" 
+                      />
+                    </motion.div>
+
+                    {/* Glass Shine Layer */}
+                    <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-[linear-gradient(45deg,transparent_20%,rgba(255,255,255,0.05)_50%,transparent_80%)] -rotate-45 pointer-events-none group-hover:translate-x-[15%] group-hover:translate-y-[15%] transition-transform duration-1000" />
                   </div>
 
                   {/* --- CARD FRONT (IMAGE) --- */}
@@ -181,7 +204,7 @@ export default function PhotoPairGame({ handleShowProposal }) {
                   </div>
                 </motion.div>
                 
-                {/* Ambient Red Glow on Hover via separate div to avoid transform-style conflicts */}
+                {/* Global Ambient Red Glow */}
                 <div className="absolute -inset-2 bg-red-500/0 group-hover:bg-red-500/10 blur-xl transition-all duration-300 -z-10 rounded-full" />
               </motion.div>
             );

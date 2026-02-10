@@ -1,254 +1,196 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Heart } from 'lucide-react';
+import React, { useState, useRef, useEffect } from "react";
+import { Heart } from "lucide-react";
 
 const OpeningScreen = ({ onUnlock }) => {
+  const [isHolding, setIsHolding] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [hearts, setHearts] = useState([]);
-  const intervalRef = useRef(null);
+  // State for the floating mini-hearts
+  const [floatingHearts, setFloatingHearts] = useState([]);
+  
+  const timerRef = useRef(null);
+  const animationFrameRef = useRef();
 
-  // Configuration
-  const FILL_TIME = 2000; 
-  const UPDATE_INTERVAL = 10; 
+  const HOLD_DURATION = 3000; 
 
+  // --- Main Hold Logic ---
   const startHolding = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
+    setIsHolding(true);
+    const startTime = Date.now();
     
-    intervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        const increment = 100 / (FILL_TIME / UPDATE_INTERVAL);
-        const newProgress = prev + increment;
-        if (newProgress >= 100) {
-          clearInterval(intervalRef.current);
-          return 100;
-        }
-        return newProgress;
-      });
+    timerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const newProgress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+      
+      setProgress(newProgress);
 
-      // --- Particle Physics ---
-      if (Math.random() < 0.4) { 
-        const newHeart = {
-          id: Date.now() + Math.random(),
-          targetX: (Math.random() - 0.5) * 100, 
-          scale: Math.random() * 0.6 + 0.3, 
-          rotation: (Math.random() - 0.5) * 40,
-        };
-        
-        setHearts((prev) => [...prev, newHeart]);
-
+      if (newProgress >= 100) {
+        clearInterval(timerRef.current);
+        // Added a small delay so the user sees the completed ring before it switches
         setTimeout(() => {
-          setHearts((prev) => prev.filter((h) => h.id !== newHeart.id));
-        }, 3000); 
+          if (onUnlock) onUnlock();
+        }, 50);
       }
-    }, UPDATE_INTERVAL);
+    }, 20);
   };
 
   const stopHolding = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        if (prev <= 0) {
-          clearInterval(intervalRef.current);
-          return 0;
-        }
-        return prev - 2; 
-      });
-    }, 5);
+    setIsHolding(false);
+    setProgress(0);
+    if (timerRef.current) clearInterval(timerRef.current);
+  };
+
+
+  // --- Particle System Logic ---
+
+  // 1. Generate new hearts while holding
+  useEffect(() => {
+    let generationInterval;
+    if (isHolding) {
+      generationInterval = setInterval(() => {
+        const newHeart = {
+          id: Date.now() + Math.random(),
+          x: (Math.random() - 0.5) * 40, 
+          y: 0,
+          speed: 1.5 + Math.random() * 2, 
+          scale: 0.3 + Math.random() * 0.5, 
+          rotation: Math.random() * 360,
+          wobbleSpeed: Math.random() * 0.05 + 0.02, 
+          opacity: 1,
+        };
+        setFloatingHearts((prev) => [...prev, newHeart]);
+      }, 80); 
+    }
+    return () => clearInterval(generationInterval);
+  }, [isHolding]);
+
+  // 2. Animate existing floating hearts loop
+  const animateParticles = () => {
+    setFloatingHearts((prevHearts) => {
+      if (prevHearts.length === 0) return prevHearts;
+      
+      const updatedHearts = prevHearts
+        .map((h) => ({
+          ...h,
+          y: h.y - h.speed, 
+          x: h.x + Math.sin(h.y * h.wobbleSpeed) * 0.5, 
+          opacity: h.opacity - 0.005, 
+          rotation: h.rotation + 1, 
+        }))
+        .filter((h) => h.opacity > 0 && h.y > -350);
+
+      return updatedHearts;
+    });
+
+    animationFrameRef.current = requestAnimationFrame(animateParticles);
   };
 
   useEffect(() => {
-    if (progress >= 100) onUnlock();
-  }, [progress, onUnlock]);
+    if (isHolding || floatingHearts.length > 0) {
+        animationFrameRef.current = requestAnimationFrame(animateParticles);
+    }
 
-  const radius = 50;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (progress / 100) * circumference;
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isHolding, floatingHearts.length]); 
+
 
   return (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-black relative overflow-hidden font-serif select-none">
-      
-      {/* --- Styles --- */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
+    <div className="min-h-screen w-full bg-[#0a0505] flex flex-col items-center justify-center overflow-hidden selection:bg-red-500/30">
+      {/* Background Glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#3d0f0f_0%,_#0a0505_60%)] opacity-80 pointer-events-none" />
 
-        @keyframes wave1 {
-          0% { top: -40%; left: -30%; transform: scale(1) rotate(0deg); }
-          33% { top: -10%; left: -10%; transform: scale(1.1) rotate(60deg); }
-          66% { top: -35%; left: 10%; transform: scale(0.9) rotate(120deg); }
-          100% { top: -40%; left: -30%; transform: scale(1) rotate(0deg); }
-        }
-        @keyframes wave2 {
-          0% { bottom: -40%; right: -30%; transform: scale(1) rotate(0deg); }
-          33% { bottom: -10%; right: -10%; transform: scale(1.1) rotate(-60deg); }
-          66% { bottom: -35%; right: 10%; transform: scale(0.9) rotate(-120deg); }
-          100% { bottom: -40%; right: -30%; transform: scale(1) rotate(-360deg); }
-        }
-        
-        @keyframes smoothPulse {
-          0% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(239,68,68,0)); }
-          50% { transform: scale(1.15); filter: drop-shadow(0 0 10px rgba(239,68,68,0.6)); }
-          100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(239,68,68,0)); }
-        }
+      <div className="relative z-10 flex flex-col items-center text-center select-none">
+        {/* Typography */}
+        <h1 
+          className="text-7xl md:text-[9rem] text-gray-100 leading-none mb-4 drop-shadow-xl"
+          style={{ fontFamily: "'Great Vibes', cursive" }}
+        >
+          Our Love Story
+        </h1>
 
-        .ambient-glow {
-          position: absolute;
-          width: 130vmax; 
-          height: 130vmax;
-          background: radial-gradient(circle at center, rgba(220, 38, 38, 0.45) 0%, rgba(153, 27, 27, 0.2) 35%, rgba(0,0,0,0) 70%);
-          animation: wave1 22s infinite ease-in-out;
-          filter: blur(140px); 
-          opacity: 0.7;
-          z-index: 0;
-          pointer-events: none;
-        }
-        .ambient-glow-2 {
-          position: absolute;
-          width:  100vmax;
-          height: 100vmax;
-          background: radial-gradient(circle at center, rgba(244, 63, 94, 0.4) 0%, rgba(136, 19, 55, 0.2) 35%, rgba(0,0,0,0) 70%);
-          animation: wave2 28s infinite ease-in-out reverse;
-          filter: blur(160px);
-          opacity: 0.6;
-          z-index: 0;
-          pointer-events: none;
-        }
+        <p className="text-red-300/70 uppercase tracking-[0.4em] text-[10px] md:text-xs mb-24 font-light">
+          Hold to unlock our memories
+        </p>
 
-        .animate-smooth-pulse {
-          animation: smoothPulse 2s infinite ease-in-out;
-        }
-      `}</style>
-      
-      {/* Background Layers */}
-      <div className="ambient-glow" />
-      <div className="ambient-glow-2" />
-      <div className="absolute inset-0 opacity-[0.05] pointer-events-none z-[1] bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
-      
-      {/* Main Content */}
-      <div className="z-10 flex flex-col items-center gap-12 relative">
-        <div className="text-center space-y-4 relative z-20">
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1 }}
-            className="text-6xl md:text-8xl text-white tracking-wide drop-shadow-2xl mix-blend-overlay"
-            style={{ fontFamily: "'Great Vibes', cursive" }}
-          >
-            Our Love Story
-          </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 1 }}
-            className="text-red-100/90 uppercase tracking-[0.3em] text-xs md:text-sm font-light"
-            style={{ fontFamily: "'Playfair Display', serif" }}
-          >
-            Hold to unlock our memories
-          </motion.p>
+        {/* Interaction Area */}
+        <div 
+          className="relative flex items-center justify-center group"
+          onMouseDown={startHolding}
+          onMouseUp={stopHolding}
+          onMouseLeave={stopHolding}
+          onTouchStart={startHolding}
+          onTouchEnd={stopHolding}
+        >
+
+          {/* Floating Particle Hearts */}
+          <div className="absolute top-1/2 left-1/2 pointer-events-none z-0">
+            {floatingHearts.map((h) => (
+              <Heart
+                key={h.id}
+                fill="#ef4444"
+                style={{
+                  position: 'absolute',
+                  left: `${h.x}px`,
+                  top: `${h.y}px`,
+                  opacity: h.opacity,
+                  transform: `translate(-50%, -50%) scale(${h.scale}) rotate(${h.rotation}deg)`,
+                }}
+                className="text-red-500 w-6 h-6"
+              />
+            ))}
+          </div>
+
+          {/* Progress Ring */}
+          <svg className="absolute w-[150px] h-[150px] -rotate-90 pointer-events-none z-20">
+            <circle
+              cx="75" cy="75" r="70"
+              stroke="rgba(255,255,255,0.05)" strokeWidth="1" fill="transparent"
+            />
+            <circle
+              cx="75" cy="75" r="70"
+              stroke="#ef4444" strokeWidth="3" fill="transparent"
+              strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 70}
+              strokeDashoffset={2 * Math.PI * 70 * (1 - progress / 100)}
+              className="transition-all duration-100 ease-linear drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+              style={{ opacity: isHolding || progress > 0 ? 1 : 0 }}
+            />
+          </svg>
+
+          {/* Outer Circle */}
+          <div className={`
+            absolute w-36 h-36 rounded-full border border-white/10 transition-transform duration-700 ease-out z-10
+            ${isHolding ? 'scale-125 border-red-500/20' : 'scale-100'}
+          `} />
+
+          {/* Inner Circle (The Heart Button) */}
+          <div className={`
+            relative w-24 h-24 rounded-full border flex items-center justify-center
+            backdrop-blur-sm transition-all duration-300 ease-out z-30
+            cursor-pointer overflow-hidden
+            ${isHolding 
+               ? 'border-red-500/40 bg-red-900/20 scale-95 drop-shadow-[0_0_15px_rgba(239,68,68,0.4)]' 
+               : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 scale-100'
+             }
+          `}>
+            <Heart 
+              className={`w-8 h-8 text-red-500 fill-red-500 transition-all duration-300
+                ${isHolding ? 'scale-110' : 'animate-pulse scale-100'}
+              `} 
+            />
+             <div className={`absolute inset-0 bg-red-500/20 blur-xl transition-opacity duration-500 ${isHolding ? 'opacity-100' : 'opacity-0'}`}></div>
+          </div>
         </div>
 
-        {/* Interactive Button */}
-        <div className="relative group w-40 h-40 flex items-center justify-center">
-          <button
-            onMouseDown={startHolding}
-            onMouseUp={stopHolding}
-            onMouseLeave={stopHolding}
-            onTouchStart={startHolding}
-            onTouchEnd={stopHolding}
-            className={`
-              absolute inset-0 flex items-center justify-center outline-none tap-highlight-transparent cursor-pointer 
-              transition-transform duration-500 ease-out
-              active:scale-95 hover:scale-105
-            `}
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-          >
-            {/* 1. LAYER ONE: Glass Background Circle (Bottom) */}
-            <div 
-              className={`
-                w-20 h-20 rounded-full transition-all duration-500 ease-out backdrop-blur-md border border-white/5 absolute z-10
-                ${progress > 0 
-                  ? 'bg-white/10 shadow-[0_0_30px_rgba(220,38,38,0.5)]' 
-                  : 'bg-transparent group-hover:bg-white/5 group-hover:shadow-[0_0_30px_rgba(239,68,68,0.3)]'}
-              `}
-            />
-
-            {/* 2. LAYER TWO: Floating Hearts (Middle - On top of glass, behind main heart) */}
-            <div className="absolute inset-0 flex items-center justify-center overflow-visible pointer-events-none z-20">
-               <AnimatePresence>
-                {hearts.map((h) => (
-                  <motion.div
-                    key={h.id}
-                    initial={{ opacity: 0, y: 0, x: 0, scale: 0 }}
-                    animate={{ 
-                      opacity: [0, 1, 0.8, 0], 
-                      y: -400,                 
-                      x: h.targetX,            
-                      scale: h.scale,
-                      rotate: h.rotation
-                    }}
-                    exit={{ opacity: 0 }}
-                    transition={{ 
-                      duration: 2.5,           
-                      ease: "easeOut" 
-                    }}
-                    className="absolute"
-                    style={{ transformOrigin: "center center" }}
-                  >
-                    <Heart fill="#ef4444" className="text-red-500/90 drop-shadow-md" />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-
-            {/* 3. LAYER THREE: SVG Ring (Middle-Top) */}
-            <svg className="w-40 h-40 transform -rotate-90 pointer-events-none absolute z-30">
-              <circle
-                cx="80"
-                cy="80"
-                r={radius}
-                stroke="rgba(255,255,255,0.1)"
-                strokeWidth="2"
-                fill="transparent"
-                className="transition-all duration-300 group-hover:stroke-white/30"
-              />
-              <circle
-                cx="80"
-                cy="80"
-                r={radius}
-                stroke="#ef4444"
-                strokeWidth="4"
-                fill="transparent"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                className="transition-all duration-75 ease-linear drop-shadow-[0_0_15px_rgba(239,68,68,0.6)] group-hover:drop-shadow-[0_0_25px_rgba(239,68,68,0.9)]"
-              />
-            </svg>
-
-            {/* 4. LAYER FOUR: Main Heart Icon (Top) */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
-              <Heart 
-                size={32}
-                fill="#ef4444" 
-                className={`
-                  text-red-500 transition-all duration-500
-                  ${progress > 0 
-                     ? 'scale-100 animate-none' 
-                     : 'animate-smooth-pulse group-hover:animate-none group-hover:scale-110'} 
-                `}
-              />
-            </div>
-          </button>
+        <div className="mt-32 opacity-50">
+          <p className="text-[9px] text-red-200 uppercase tracking-[0.6em]">
+            Press and Hold
+          </p>
         </div>
       </div>
-
-      <motion.div 
-        animate={{ opacity: [0.3, 1, 0.3] }}
-        transition={{ repeat: Infinity, duration: 2 }}
-        className="absolute bottom-12 text-white/30 text-[10px] uppercase tracking-widest z-10"
-        style={{ fontFamily: "'Playfair Display', serif" }}
-      >
-        Press and hold
-      </motion.div>
     </div>
   );
 };
